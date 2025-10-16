@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Collaborator;
-use Mpdf\Mpdf;
-use Illuminate\Support\Facades\Storage;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ContractController extends Controller
 {
@@ -12,36 +11,26 @@ class ContractController extends Controller
     {
         $collaborator = Collaborator::findOrFail($id);
 
-        // Seleciona o template de acordo com o tipo
+        // Seleciona o template de acordo com o tipo de contrato
         $templateView = match($collaborator->contract_type) {
             'indeterminado' => 'contracts.contrato_indeterminado',
-            'determinado'  => 'contracts.contrato_determinado',
-            'temporario'   => 'contracts.contrato_temporario',
-            'experiencia'  => 'contracts.contrato_experiencia',
-            default        => 'contracts.contrato_indeterminado'
+            'determinado'   => 'contracts.contrato_determinado',
+            'temporario'    => 'contracts.contrato_temporario',
+            'experiencia'   => 'contracts.contrato_experiencia',
+            default         => 'contracts.contrato_indeterminado',
         };
 
-        // Renderiza o HTML do Blade
-        $html = view($templateView, compact('collaborator'))->render();
+        // Renderiza o Blade como HTML
+        $pdf = PDF::loadView($templateView, compact('collaborator'));
 
-        // Cria PDF com mPDF
-        $mpdf = new Mpdf([
-            'tempDir' => storage_path('app/tmp'), // necessário em alguns ambientes Codespaces
-        ]);
-        $mpdf->WriteHTML($html);
+        // Define o caminho do arquivo PDF
+        $fileName = 'contrato_'.$collaborator->id.'.pdf';
+        $filePath = storage_path('app/contracts/'.$fileName);
 
-        // Gera o arquivo
-        $fileName = 'contrato_' . $collaborator->id . '.pdf';
-        $pdfPath = storage_path('app/contracts/' . $fileName);
+        // Salva o PDF
+        $pdf->save($filePath);
 
-        // Certifique-se que a pasta existe
-        if (!file_exists(storage_path('app/contracts'))) {
-            mkdir(storage_path('app/contracts'), 0777, true);
-        }
-
-        $mpdf->Output($pdfPath, \Mpdf\Output\Destination::FILE);
-
-        // Retorna para download
-        return response()->download($pdfPath);
+        // Retorna o download do PDF
+        return response()->download($filePath);
     }
 }
